@@ -854,6 +854,17 @@ func (s *BackrestHandler) GetSummaryDashboard(ctx context.Context, req *connect.
 		DataPath:   env.DataDir(),
 	}
 
+	if s.orchestrator != nil {
+		response.ResticPath = s.orchestrator.ResticBinary()
+		if response.ResticPath != "" {
+			if version, err := resticinstaller.GetResticVersion(response.ResticPath); err != nil {
+				zap.S().Warnf("failed to determine restic version: %v", err)
+			} else {
+				response.ResticVersion = version
+			}
+		}
+	}
+
 	for _, repo := range config.Repos {
 		resp, err := generateSummaryHelper(repo.Id, oplog.Query{}.
 			SetInstanceID(config.Instance).

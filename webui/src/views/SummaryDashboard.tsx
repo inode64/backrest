@@ -141,6 +141,16 @@ export const SummaryDashboard = () => {
               label: "Data Directory",
               children: summaryData.dataPath,
             },
+            {
+              key: 3,
+              label: "Restic Version",
+              children: summaryData.resticVersion || "Unknown",
+            },
+            {
+              key: 4,
+              label: "Restic Binary",
+              children: summaryData.resticPath || "Unknown",
+            },
           ]}
         />
         <Collapse

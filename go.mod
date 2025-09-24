@@ -26,6 +26,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hectane/go-acl v0.0.0-20230122075934-ca0b05cb1adb
+	github.com/kardianos/service v1.2.2
 	github.com/mattn/go-colorable v0.1.14
 	github.com/natefinch/atomic v1.0.1
 	github.com/ncruces/zenity v0.10.14
@@ -46,7 +47,6 @@ require (
 require (
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bufbuild/connect-go v1.10.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dchest/jsmin v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

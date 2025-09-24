@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,6 +30,7 @@ import (
 	"github.com/garethgeorge/backrest/internal/orchestrator"
 	"github.com/garethgeorge/backrest/internal/resticinstaller"
 	"github.com/garethgeorge/backrest/webui"
+	"github.com/kardianos/service"
 	"github.com/mattn/go-colorable"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -40,6 +42,8 @@ import (
 )
 
 var InstallDepsOnly = flag.Bool("install-deps-only", false, "install dependencies and exit")
+var serviceCommand = flag.String("service", "", "manage the Backrest background service (install, uninstall, start, stop, restart, status)")
+var serviceRunMode = flag.String("service-run-mode", "", "set the Windows service run mode (user or system)")
 var (
 	version = "unknown"
 	commit  = "unknown"
@@ -47,8 +51,126 @@ var (
 
 func main() {
 	flag.Parse()
-	installLoggers()
 
+	program := &backrestProgram{}
+	svcConfig := &service.Config{
+		Name:        "backrest",
+		DisplayName: "Backrest",
+		Description: "Backrest backup orchestration service",
+	}
+
+	svcOptions := service.KeyValue{}
+	var runMode string
+	switch runtime.GOOS {
+	case "windows":
+		runMode = *serviceRunMode
+		if runMode == "" {
+			runMode = "user"
+		}
+		switch runMode {
+		case "user":
+			svcOptions["UserService"] = true
+		case "system":
+		default:
+			fmt.Fprintf(os.Stderr, "invalid service run mode %q: must be 'user' or 'system'\n", runMode)
+			os.Exit(1)
+		}
+	default:
+		svcOptions["SystemdUserService"] = true
+	}
+	if len(svcOptions) > 0 {
+		svcConfig.Option = svcOptions
+	}
+
+	if runMode != "" {
+		svcConfig.Arguments = append(svcConfig.Arguments, fmt.Sprintf("--service-run-mode=%s", runMode))
+	}
+	svcConfig.Arguments = append(svcConfig.Arguments, collectServiceArguments()...)
+
+	svc, err := service.New(program, svcConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error configuring service: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *serviceCommand != "" {
+		if err := service.Control(svc, *serviceCommand); err != nil {
+			fmt.Fprintf(os.Stderr, "error executing service command %q: %v\n", *serviceCommand, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stdout, "service command %q executed successfully\n", *serviceCommand)
+		return
+	}
+
+	if service.Interactive() {
+		if err := program.runInteractive(); err != nil {
+			zap.S().Fatalf("backrest exited with error: %v", err)
+		}
+		return
+	}
+
+	if err := svc.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error running service: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+type backrestProgram struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+func (p *backrestProgram) runInteractive() error {
+	installLoggers()
+	ctx := p.setupContext(true)
+	runBackrest(ctx)
+	close(p.done)
+	return nil
+}
+
+func (p *backrestProgram) Start(_ service.Service) error {
+	ctx := p.setupContext(false)
+	go func() {
+		installLoggers()
+		runBackrest(ctx)
+		close(p.done)
+	}()
+	return nil
+}
+
+func (p *backrestProgram) Stop(_ service.Service) error {
+	if p.cancel != nil {
+		p.cancel()
+	}
+	if p.done != nil {
+		<-p.done
+	}
+	return nil
+}
+
+func (p *backrestProgram) setupContext(enableForceKill bool) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	p.cancel = cancel
+	p.done = make(chan struct{})
+	go onterm(os.Interrupt, cancel)
+	if enableForceKill {
+		go onterm(os.Interrupt, newForceKillHandler())
+	}
+	return ctx
+}
+
+func collectServiceArguments() []string {
+	var args []string
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "bind-address", "config-file", "data-dir", "restic-cmd", "multihost-heartbeat-interval":
+			args = append(args, fmt.Sprintf("--%s=%s", f.Name, f.Value.String()))
+		}
+	})
+	return args
+}
+
+func runBackrest(ctx context.Context) {
 	resticPath, err := resticinstaller.FindOrInstallResticBinary()
 	if err != nil {
 		zap.S().Fatalf("error finding or installing restic: %v", err)
@@ -58,10 +180,6 @@ func main() {
 		zap.S().Info("dependencies installed, exiting")
 		return
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go onterm(os.Interrupt, cancel)
-	go onterm(os.Interrupt, newForceKillHandler())
 
 	// Load the configuration
 	configMgr := &config.ConfigManager{Store: createConfigProvider()}

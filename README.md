@@ -158,11 +158,33 @@ services:
 > Adjust the `User` in the systemd service file if needed. The install script and manual systemd instructions use your current user by default.
 >
 > By default backrest listens only on localhost, you can open optionally open it up to remote connections by setting the `BACKREST_PORT` environment variable. For systemd installations, run `sudo systemctl edit backrest` and add:
+
 > ```
 > [Service]
 > Environment="BACKREST_PORT=0.0.0.0:9898"
 > ```
 > Using `0.0.0.0` allows connections from any interface.
+
+### Run Backrest as a background service (Linux and Windows)
+
+Backrest also ships with built-in service management so you can register it as a background service without external scripts. Use the `--service` flag with the Backrest binary to install, start, stop, or uninstall the service:
+
+```sh
+# Install the service for the current user (default)
+backrest --service install
+
+# Install the service for the Windows system account
+backrest --service install --service-run-mode=system
+
+# Start or stop the service
+backrest --service start
+backrest --service stop
+
+# Remove the service
+backrest --service uninstall
+```
+
+On Linux the command creates a user-level systemd service, while on Windows it registers either a per-user or system-wide service with the Service Control Manager depending on the `--service-run-mode` flag. Run the commands from an elevated shell if your environment requires it. The Windows installer uses the same flag internally to set up the appropriate service when you choose the administrative startup tasks.
 
 ### Arch Linux
 

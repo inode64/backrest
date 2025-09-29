@@ -10,7 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func getResticVersion(binary string) (string, error) {
+// GetResticVersion returns the restic version string for the provided binary.
+func GetResticVersion(binary string) (string, error) {
 	cmd := exec.Command(binary, "version")
 	out, err := cmd.Output()
 	// check if error is a binary not found error
@@ -32,7 +33,7 @@ func assertResticVersion(binary string, strict bool) error {
 		return fmt.Errorf("check if restic binary exists: %w", err)
 	}
 
-	if version, err := getResticVersion(binary); err != nil {
+	if version, err := GetResticVersion(binary); err != nil {
 		return fmt.Errorf("determine restic version: %w", err)
 	} else {
 		cmp := compareSemVer(mustParseSemVer(version), requiredVersionSemver)

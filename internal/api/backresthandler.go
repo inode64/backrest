@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -854,6 +855,16 @@ func (s *BackrestHandler) GetSummaryDashboard(ctx context.Context, req *connect.
 		DataPath:   env.DataDir(),
 	}
 
+	if hostname, err := os.Hostname(); err != nil {
+		zap.S().Warnf("failed to determine hostname: %v", err)
+	} else if hostname != "" {
+		response.Hostname = hostname
+	}
+
+	if version := systemOSVersion(); version != "" {
+		response.OsVersion = version
+	}
+
 	if s.orchestrator != nil {
 		response.ResticPath = s.orchestrator.ResticBinary()
 		if response.ResticPath != "" {
@@ -892,4 +903,28 @@ func (s *BackrestHandler) GetSummaryDashboard(ctx context.Context, req *connect.
 	}
 
 	return connect.NewResponse(response), nil
+}
+
+func systemOSVersion() string {
+	if data, err := os.ReadFile("/etc/os-release"); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "PRETTY_NAME=") {
+				value := strings.TrimPrefix(line, "PRETTY_NAME=")
+				value = strings.Trim(value, "\"'")
+				if value != "" {
+					return value
+				}
+			}
+		}
+	}
+
+	if runtime.GOOS != "" {
+		if runtime.GOARCH != "" {
+			return fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+		}
+		return runtime.GOOS
+	}
+
+	return ""
 }

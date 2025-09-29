@@ -151,6 +151,16 @@ export const SummaryDashboard = () => {
               label: "Restic Binary",
               children: summaryData.resticPath || "Unknown",
             },
+            {
+              key: 5,
+              label: "Hostname",
+              children: summaryData.hostname || "Unknown",
+            },
+            {
+              key: 6,
+              label: "OS Version",
+              children: summaryData.osVersion || "Unknown",
+            },
           ]}
         />
         <Collapse

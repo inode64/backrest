@@ -24,6 +24,9 @@ var windowsTray = flag.Bool("windows-tray", false, "run the windows tray applica
 
 func main() {
 	flag.Parse()
+	if handleServiceCommand() {
+		return
+	}
 	if *windowsTray {
 		startTray()
 	} else {

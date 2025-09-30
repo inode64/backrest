@@ -221,6 +221,23 @@ Download the Windows installer for your architecture from the [releases page](ht
 > [!TIP]
 > To override the default port before installation, set a user environment variable named BACKREST_PORT. On Windows 10+, navigate to Settings > About > Advanced system settings > Environment Variables. Under "User variables", create a new variable `BACKREST_PORT` with the value "127.0.0.1:port" (e.g., "127.0.0.1:8080" for port 8080). If changing post-installation, re-run the installer to update shortcuts with the new port.
 
+### Background service (Windows & Linux)
+
+Backrest ships with a built-in service manager that can install, start, and stop the application as a background service on Windows and Linux. Use the `--service` flag to control the lifecycle:
+
+```sh
+# Install the service and configure the bind address
+backrest --service install --service-arg=--bind-address=127.0.0.1:9897
+
+# Start, stop, or remove the service
+backrest --service start
+backrest --service stop
+backrest --service uninstall
+```
+
+> [!TIP]
+> On Linux, specify an alternate account for the service with `--service-user=<username>`. Repeat `--service-arg` to forward additional Backrest flags such as `--data-dir` or `--config-file`.
+
 # Configuration
 
 ## Environment Variables (Unix)

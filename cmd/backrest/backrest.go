@@ -45,6 +45,10 @@ var (
 )
 
 func runApp() {
+	runAppWithContext(context.Background(), true)
+}
+
+func runAppWithContext(parent context.Context, handleSignals bool) {
 	installLoggers()
 
 	resticPath, err := resticinstaller.FindOrInstallResticBinary()
@@ -57,9 +61,12 @@ func runApp() {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go onterm(os.Interrupt, cancel)
-	go onterm(os.Interrupt, newForceKillHandler())
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	if handleSignals {
+		go onterm(os.Interrupt, cancel)
+		go onterm(os.Interrupt, newForceKillHandler())
+	}
 
 	// Load the configuration
 	configMgr := &config.ConfigManager{Store: createConfigProvider()}

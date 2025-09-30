@@ -83,8 +83,11 @@ PrivilegesRequiredOverrideAllUsers=Install &system-wide with administrative priv
 ; Use Task Scheduler to run Backrest elevated. The 30s delay is needed to avoid an issue with tray icon being broken.
 ; The double-quotes escape double-quotes inside the parameter. The backslash escapes double-quotes inside the -Command block.
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""$t = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME ; $t.Delay = 'PT30S'; $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries; $s.ExecutionTimeLimit = 'PT0S'; Register-ScheduledTask -Force -TaskName '{#B}' -RunLevel Highest -Trigger $t -Action $(New-ScheduledTaskAction -Execute \""{app}\backrest.exe\"" -Argument '--windows-tray --bind-address 127.0.0.1:9897' -WorkingDirectory '{app}') -Settings $s ; Start-ScheduledTask -TaskName '{#B}'"" "; Flags: runascurrentuser logoutput runhidden; Tasks: adminstartcurrent; Check: IsAdminInstallMode
-; System user task. No need for systray here, and running it without returning control is the only way to stop it gracefully later.
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries; $s.ExecutionTimeLimit = 'PT0S'; Register-ScheduledTask -Force -TaskName '{#B}' -RunLevel Highest -User System -Trigger $(New-ScheduledTaskTrigger -AtStartup) -Action $(New-ScheduledTaskAction -Execute \""{app}\backrest.exe\"" -Argument '--bind-address 127.0.0.1:9897' -WorkingDirectory '{app}') -Settings $s ; Start-ScheduledTask -TaskName '{#B}'"" "; Flags: runascurrentuser logoutput runhidden; Tasks: adminstartsystem; Check: IsAdminInstallMode
+; Install or update the background service for system-wide runs.
+Filename: "{app}\backrest.exe"; Parameters: "--service install --service-arg=--bind-address=127.0.0.1:9897"; Flags: logoutput runhidden; Tasks: adminstartsystem; Check: IsAdminInstallMode
+Filename: "{app}\backrest.exe"; Parameters: "--service start"; Flags: logoutput runhidden; Tasks: adminstartsystem; Check: IsAdminInstallMode
+Filename: "{app}\backrest.exe"; Parameters: "--service stop"; Flags: logoutput runhidden; Tasks: not adminstartsystem; Check: IsAdminInstallMode
+Filename: "{app}\backrest.exe"; Parameters: "--service uninstall"; Flags: logoutput runhidden; Tasks: not adminstartsystem; Check: IsAdminInstallMode
 ; PATH
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""$newp = '{app}'; $a = [Environment]::GetEnvironmentVariable('PATH', '{code:GetEnvTarget}') -split ';' ; if ($a -notcontains $newp) {{ echo 'Adding to PATH'; $a += $newp; $path = $a -join ';' ; [Environment]::SetEnvironmentVariable('PATH', $path, '{code:GetEnvTarget}') }"" "; Flags: logoutput runhidden; Tasks: addtopath
 ; Remove from PATH for existing installation when unchecked.
@@ -193,6 +196,13 @@ begin
     // Remove the task when uninstalling.
     if IsUninstaller then
       ExecAndLogOutput(Cmd, '/C schtasks /Delete /TN ' + AppName + ' /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode, nil);
+  end;
+
+  if IsAdminInstallMode and FileExists(ExpandConstant('{app}\backrest.exe')) then
+  begin
+    ExecAndLogOutput(ExpandConstant('{app}\backrest.exe'), '--service stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode, nil);
+    if IsUninstaller then
+      ExecAndLogOutput(ExpandConstant('{app}\backrest.exe'), '--service uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode, nil);
   end;
 end;
 

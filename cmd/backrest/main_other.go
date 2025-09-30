@@ -6,5 +6,8 @@ import "flag"
 
 func main() {
 	flag.Parse()
+	if handleServiceCommand() {
+		return
+	}
 	runApp()
 }
